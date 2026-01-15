@@ -146,6 +146,86 @@ impl VercelService {
 
         Ok(user)
     }
+
+    /// List env vars implementation.
+    fn list_env_vars(&self, params: HashMap<String, Value>) -> Result<Value> {
+        let project_id = Self::get_param_str(&params, "project_id")
+            .ok_or_else(|| anyhow::anyhow!("Missing required parameter: project_id"))?
+            .to_string();
+        let target = Self::get_param_str(&params, "target").map(|s| s.to_string());
+
+        let client = self.client.clone();
+
+        let result = self.runtime.block_on(async move {
+            client.list_env_vars(&project_id, target.as_deref()).await
+        })?;
+
+        Ok(result)
+    }
+
+    /// Set env var implementation.
+    fn set_env_var(&self, params: HashMap<String, Value>) -> Result<Value> {
+        let project_id = Self::get_param_str(&params, "project_id")
+            .ok_or_else(|| anyhow::anyhow!("Missing required parameter: project_id"))?
+            .to_string();
+        let key = Self::get_param_str(&params, "key")
+            .ok_or_else(|| anyhow::anyhow!("Missing required parameter: key"))?
+            .to_string();
+        let value = Self::get_param_str(&params, "value")
+            .ok_or_else(|| anyhow::anyhow!("Missing required parameter: value"))?
+            .to_string();
+
+        // Parse target array if provided
+        let target: Option<Vec<String>> = params
+            .get("target")
+            .and_then(|v| v.as_array())
+            .map(|arr| {
+                arr.iter()
+                    .filter_map(|v| v.as_str().map(|s| s.to_string()))
+                    .collect()
+            });
+
+        let env_type = Self::get_param_str(&params, "type").map(|s| s.to_string());
+
+        let client = self.client.clone();
+
+        let result = self.runtime.block_on(async move {
+            let target_refs: Option<Vec<&str>> = target.as_ref().map(|v| v.iter().map(|s| s.as_str()).collect());
+            client.set_env_var(&project_id, &key, &value, target_refs, env_type.as_deref()).await
+        })?;
+
+        Ok(result)
+    }
+
+    /// List domains implementation.
+    fn list_domains(&self, params: HashMap<String, Value>) -> Result<Value> {
+        let project_id = Self::get_param_str(&params, "project_id")
+            .ok_or_else(|| anyhow::anyhow!("Missing required parameter: project_id"))?
+            .to_string();
+
+        let client = self.client.clone();
+
+        let result = self.runtime.block_on(async move {
+            client.list_domains(&project_id).await
+        })?;
+
+        Ok(result)
+    }
+
+    /// Redeploy implementation.
+    fn redeploy(&self, params: HashMap<String, Value>) -> Result<Value> {
+        let deployment_id = Self::get_param_str(&params, "deployment_id")
+            .ok_or_else(|| anyhow::anyhow!("Missing required parameter: deployment_id"))?
+            .to_string();
+
+        let client = self.client.clone();
+
+        let result = self.runtime.block_on(async move {
+            client.redeploy(&deployment_id).await
+        })?;
+
+        Ok(result)
+    }
 }
 
 impl FgpService for VercelService {
@@ -166,6 +246,10 @@ impl FgpService for VercelService {
             "deployment" | "vercel.deployment" => self.get_deployment(params),
             "logs" | "vercel.logs" => self.get_deployment_logs(params),
             "user" | "vercel.user" => self.get_user(),
+            "env_vars" | "vercel.env_vars" => self.list_env_vars(params),
+            "set_env" | "vercel.set_env" => self.set_env_var(params),
+            "domains" | "vercel.domains" => self.list_domains(params),
+            "redeploy" | "vercel.redeploy" => self.redeploy(params),
             _ => anyhow::bail!("Unknown method: {}", method),
         }
     }
@@ -234,6 +318,80 @@ impl FgpService for VercelService {
                 name: "vercel.user".into(),
                 description: "Get current user info".into(),
                 params: vec![],
+            },
+            MethodInfo {
+                name: "vercel.env_vars".into(),
+                description: "List environment variables for a project".into(),
+                params: vec![
+                    ParamInfo {
+                        name: "project_id".into(),
+                        param_type: "string".into(),
+                        required: true,
+                        default: None,
+                    },
+                    ParamInfo {
+                        name: "target".into(),
+                        param_type: "string".into(),
+                        required: false,
+                        default: None,
+                    },
+                ],
+            },
+            MethodInfo {
+                name: "vercel.set_env".into(),
+                description: "Set an environment variable".into(),
+                params: vec![
+                    ParamInfo {
+                        name: "project_id".into(),
+                        param_type: "string".into(),
+                        required: true,
+                        default: None,
+                    },
+                    ParamInfo {
+                        name: "key".into(),
+                        param_type: "string".into(),
+                        required: true,
+                        default: None,
+                    },
+                    ParamInfo {
+                        name: "value".into(),
+                        param_type: "string".into(),
+                        required: true,
+                        default: None,
+                    },
+                    ParamInfo {
+                        name: "target".into(),
+                        param_type: "array".into(),
+                        required: false,
+                        default: Some(serde_json::json!(["production", "preview", "development"])),
+                    },
+                    ParamInfo {
+                        name: "type".into(),
+                        param_type: "string".into(),
+                        required: false,
+                        default: Some(serde_json::json!("encrypted")),
+                    },
+                ],
+            },
+            MethodInfo {
+                name: "vercel.domains".into(),
+                description: "List domains for a project".into(),
+                params: vec![ParamInfo {
+                    name: "project_id".into(),
+                    param_type: "string".into(),
+                    required: true,
+                    default: None,
+                }],
+            },
+            MethodInfo {
+                name: "vercel.redeploy".into(),
+                description: "Redeploy a deployment".into(),
+                params: vec![ParamInfo {
+                    name: "deployment_id".into(),
+                    param_type: "string".into(),
+                    required: true,
+                    default: None,
+                }],
             },
         ]
     }

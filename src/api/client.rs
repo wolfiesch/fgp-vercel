@@ -52,6 +52,33 @@ impl VercelClient {
             .context("Failed to parse response")
     }
 
+    /// Make an authenticated POST request.
+    async fn post<T: for<'de> Deserialize<'de>>(&self, endpoint: &str, body: &Value) -> Result<T> {
+        let url = format!("{}{}", API_BASE, endpoint);
+
+        let response = self
+            .client
+            .post(&url)
+            .header("Authorization", format!("Bearer {}", self.token))
+            .header("Accept", "application/json")
+            .header("Content-Type", "application/json")
+            .json(body)
+            .send()
+            .await
+            .context("Failed to send request")?;
+
+        if !response.status().is_success() {
+            let status = response.status();
+            let text = response.text().await.unwrap_or_default();
+            anyhow::bail!("API request failed: {} - {}", status, text);
+        }
+
+        response
+            .json()
+            .await
+            .context("Failed to parse response")
+    }
+
     /// Check if the client can connect to Vercel API.
     pub async fn ping(&self) -> Result<bool> {
         let url = format!("{}/v2/user", API_BASE);
@@ -136,5 +163,75 @@ impl VercelClient {
     /// Get user info as raw JSON.
     pub async fn get_user_raw(&self) -> Result<Value> {
         self.get("/v2/user").await
+    }
+
+    /// List environment variables for a project.
+    pub async fn list_env_vars(&self, project_id: &str, target: Option<&str>) -> Result<Value> {
+        let mut endpoint = format!("/v9/projects/{}/env", project_id);
+        if let Some(t) = target {
+            endpoint.push_str(&format!("?target={}", t));
+        }
+
+        #[derive(Deserialize)]
+        struct EnvVarsResponse {
+            envs: Vec<Value>,
+        }
+
+        let response: EnvVarsResponse = self.get(&endpoint).await?;
+        Ok(serde_json::json!({
+            "env_vars": response.envs,
+            "count": response.envs.len(),
+        }))
+    }
+
+    /// Set an environment variable for a project.
+    pub async fn set_env_var(
+        &self,
+        project_id: &str,
+        key: &str,
+        value: &str,
+        target: Option<Vec<&str>>,
+        env_type: Option<&str>,
+    ) -> Result<Value> {
+        let endpoint = format!("/v10/projects/{}/env", project_id);
+
+        let targets = target.unwrap_or_else(|| vec!["production", "preview", "development"]);
+        let env_type = env_type.unwrap_or("encrypted");
+
+        let body = serde_json::json!({
+            "key": key,
+            "value": value,
+            "target": targets,
+            "type": env_type
+        });
+
+        let result: Value = self.post(&endpoint, &body).await?;
+        Ok(serde_json::json!({
+            "created": true,
+            "env": result
+        }))
+    }
+
+    /// List domains for a project.
+    pub async fn list_domains(&self, project_id: &str) -> Result<Value> {
+        let endpoint = format!("/v9/projects/{}/domains", project_id);
+
+        #[derive(Deserialize)]
+        struct DomainsResponse {
+            domains: Vec<Value>,
+        }
+
+        let response: DomainsResponse = self.get(&endpoint).await?;
+        Ok(serde_json::json!({
+            "domains": response.domains,
+            "count": response.domains.len(),
+        }))
+    }
+
+    /// Redeploy a deployment.
+    pub async fn redeploy(&self, deployment_id: &str) -> Result<Value> {
+        let endpoint = format!("/v13/deployments/{}/redeploy", deployment_id);
+        let body = serde_json::json!({});
+        self.post(&endpoint, &body).await
     }
 }

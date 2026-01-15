@@ -52,6 +52,39 @@
       "name": "vercel.user",
       "description": "Get current user info",
       "params": []
+    },
+    {
+      "name": "vercel.env_vars",
+      "description": "List environment variables for a project",
+      "params": [
+        {"name": "project_id", "type": "string", "required": true},
+        {"name": "target", "type": "string", "required": false}
+      ]
+    },
+    {
+      "name": "vercel.set_env",
+      "description": "Set an environment variable",
+      "params": [
+        {"name": "project_id", "type": "string", "required": true},
+        {"name": "key", "type": "string", "required": true},
+        {"name": "value", "type": "string", "required": true},
+        {"name": "target", "type": "array", "required": false, "default": ["production", "preview", "development"]},
+        {"name": "type", "type": "string", "required": false, "default": "encrypted"}
+      ]
+    },
+    {
+      "name": "vercel.domains",
+      "description": "List domains for a project",
+      "params": [
+        {"name": "project_id", "type": "string", "required": true}
+      ]
+    },
+    {
+      "name": "vercel.redeploy",
+      "description": "Redeploy a deployment",
+      "params": [
+        {"name": "deployment_id", "type": "string", "required": true}
+      ]
     }
   ],
   "auth": {
