@@ -1,0 +1,63 @@
+{
+  "name": "vercel",
+  "version": "0.1.0-alpha",
+  "description": "Fast Vercel operations via FGP daemon",
+  "protocol": "fgp@1",
+  "author": "Wolfgang Schoenberger",
+  "license": "MIT",
+  "repository": "https://github.com/fast-gateway-protocol/vercel",
+  "daemon": {
+    "entrypoint": "./target/release/fgp-vercel",
+    "socket": "vercel/daemon.sock",
+    "dependencies": []
+  },
+  "methods": [
+    {
+      "name": "vercel.projects",
+      "description": "List all projects",
+      "params": [
+        {"name": "limit", "type": "integer", "required": false, "default": 20}
+      ]
+    },
+    {
+      "name": "vercel.project",
+      "description": "Get project details",
+      "params": [
+        {"name": "project_id", "type": "string", "required": true}
+      ]
+    },
+    {
+      "name": "vercel.deployments",
+      "description": "List deployments for a project",
+      "params": [
+        {"name": "project_id", "type": "string", "required": true},
+        {"name": "limit", "type": "integer", "required": false, "default": 10}
+      ]
+    },
+    {
+      "name": "vercel.deployment",
+      "description": "Get deployment details",
+      "params": [
+        {"name": "deployment_id", "type": "string", "required": true}
+      ]
+    },
+    {
+      "name": "vercel.logs",
+      "description": "Get deployment logs/events",
+      "params": [
+        {"name": "deployment_id", "type": "string", "required": true}
+      ]
+    },
+    {
+      "name": "vercel.user",
+      "description": "Get current user info",
+      "params": []
+    }
+  ],
+  "auth": {
+    "type": "token",
+    "env_var": "VERCEL_TOKEN",
+    "setup_url": "https://vercel.com/account/tokens"
+  },
+  "platforms": ["darwin", "linux"]
+}
